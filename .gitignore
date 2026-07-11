@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.python-version
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+keystore.json
+
+# Local state / data
+*.sqlite
+*.sqlite3
+*.db
+data/
+logs/
+*.log
+
+# Terraform (mirrors infrastructure repo)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

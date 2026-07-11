@@ -1,0 +1,87 @@
+# ============================================================================
+# Trading agent configuration. Verified $500 risk envelope — edit with care.
+# Every value here is enforced in DETERMINISTIC CODE the LLM cannot override.
+# ============================================================================
+
+mode: paper            # paper | live. Paper simulates fills; never touches real funds.
+
+account:
+  starting_equity_usd: 500.0
+
+chain:
+  name: base
+  chain_id: 8453
+  # rpc_url pulled from BASE_RPC_URL env (see .env.example)
+
+# ---- Universe: liquid majors vs USDC on Base. No alts. ----
+universe:
+  - symbol: WETH-USDC
+    base: WETH
+    quote: USDC
+    coingecko_id: ethereum     # price source (paper MVP)
+    decimals: 18
+  - symbol: cbBTC-USDC
+    base: cbBTC
+    quote: USDC
+    coingecko_id: bitcoin
+    decimals: 8
+
+# ---- Risk envelope ($500). The non-negotiable price of full autonomy. ----
+risk:
+  max_risk_per_trade_pct: 1.0     # $5 on $500
+  max_position_notional_pct: 25.0 # ~$125 cap per position
+  max_concurrent_positions: 2
+  max_deployed_pct: 50.0          # never deploy more than half of equity at once
+  daily_loss_cap_pct: 3.0         # -3% (-$15) -> halt for the day
+  drawdown_alert_pct: 10.0        # warn
+  drawdown_kill_pct: 15.0         # -15% (-$75) -> kill + require manual re-arm
+  max_trades_per_day: 3
+  leverage_cap: 1                 # spot only; 1x. NEVER raise without review.
+  sizing_mode: risk_pct           # risk_pct | fixed_fraction | vol_target
+  fixed_fraction_pct: 25.0        # only used when sizing_mode == fixed_fraction
+  target_annual_vol_pct: 40.0     # only used when sizing_mode == vol_target (TSMOM)
+
+# ---- Strategy. The PROFITABLE backtested choice is trend_long_flat on daily
+#      (+33% net / ~15% maxDD over a full cycle vs B&H +620%/83% DD). GLM overlays it. ----
+strategy:
+  name: trend_long_flat            # swing | trend_long_flat | ema_cross | mean_reversion | momentum
+  timeframe: 1d                    # daily — 4H/intraday loses to fees+slippage (verified)
+  donchian_period: 20             # breakout over N-bar high
+  ema_fast: 9
+  ema_slow: 21
+  atr_period: 14
+  stop_atr_mult: 1.5              # stop = max(1.5*ATR, min_stop_pct)
+  min_stop_pct: 1.0
+  take_profit_atr_mult: 3.0
+  volume_filter_mult: 1.2         # require volume > 1.2x average on breakout
+
+# ---- GLM brain (z.ai PAYG). Regime/sentiment gate, NOT the order-issuer. ----
+glm:
+  base_url: https://api.z.ai/api/paas/v4   # PAYG general endpoint (headless-OK)
+  model: glm-4.6                            # routine calls ($0.6/$2.2 per Mtok)
+  overlay_model: glm-5.2                    # escalated for genuinely ambiguous setups
+  api_key_env: ZAI_API_KEY
+  temperature: 0.2
+  max_tokens: 512
+  # If no key is set (paper mode), the overlay returns a neutral gate (approve, 1.0).
+
+# ---- Execution. CowSwap primary (structural MEV protection + gasless). ----
+execution:
+  router: cowswap
+  slippage_bps: 50               # 0.5% on entries
+  stop_slippage_bps: 200         # 2% on stop-sells (guarantee exit over price)
+  cowswap_api_url: https://api.cow.fi/base
+  deadline_seconds: 60
+
+# ---- Keeper (stop-loss monitor) ----
+keeper:
+  # Evaluate stops on each 4H bar close + a low-frequency safety poll between bars.
+  bar_close_cron: "7 1,5,9,13,17,21 * * *"  # ~every 4h, offset off the hour
+  safety_poll_minutes: 15
+
+# ---- Deployment (AWS via Terraform in the sibling infrastructure repo) ----
+deployment:
+  aws_region: ap-southeast-1
+
+alerts:
+  telegram_enabled: false
