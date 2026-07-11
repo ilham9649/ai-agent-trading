@@ -2,6 +2,7 @@ from trading_agent.config import Settings
 from trading_agent.strategy.ema_cross import EmaCrossStrategy
 from trading_agent.strategy.mean_reversion import MeanReversionStrategy
 from trading_agent.strategy.momentum import MomentumStrategy
+from trading_agent.strategy.robust_trend import RobustTrend
 from trading_agent.strategy.swing import SwingStrategy
 from trading_agent.strategy.trend_long_flat import TrendLongFlat
 
@@ -9,6 +10,8 @@ from trading_agent.strategy.trend_long_flat import TrendLongFlat
 def build_strategy(settings: Settings):
     """Select the strategy from settings.strategy.name (default: swing)."""
     name = getattr(settings.strategy, "name", "swing")
+    if name == "robust_trend":
+        return RobustTrend(settings)
     if name == "trend_long_flat":
         return TrendLongFlat(settings)
     if name == "ema_cross":
@@ -26,5 +29,6 @@ __all__ = [
     "EmaCrossStrategy",
     "MeanReversionStrategy",
     "MomentumStrategy",
+    "RobustTrend",
     "TrendLongFlat",
 ]

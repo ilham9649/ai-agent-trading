@@ -13,47 +13,139 @@ chain:
   chain_id: 8453
   # rpc_url pulled from BASE_RPC_URL env (see .env.example)
 
-# ---- Universe: liquid majors vs USDC on Base. No alts. ----
+# ---- Universe: 10 liquid majors (spot, USDC pair). No leveraged alts. ----
+# Binance feed maps base symbol → USDT pair for historical data.
 universe:
-  - symbol: WETH-USDC
-    base: WETH
-    quote: USDC
-    coingecko_id: ethereum     # price source (paper MVP)
-    decimals: 18
-  - symbol: cbBTC-USDC
-    base: cbBTC
+  - symbol: BTC-USDC
+    base: BTC
     quote: USDC
     coingecko_id: bitcoin
     decimals: 8
+  - symbol: ETH-USDC
+    base: ETH
+    quote: USDC
+    coingecko_id: ethereum
+    decimals: 18
+  - symbol: BNB-USDC
+    base: BNB
+    quote: USDC
+    coingecko_id: binancecoin
+    decimals: 18
+  - symbol: SOL-USDC
+    base: SOL
+    quote: USDC
+    coingecko_id: solana
+    decimals: 9
+  - symbol: XRP-USDC
+    base: XRP
+    quote: USDC
+    coingecko_id: ripple
+    decimals: 6
+  - symbol: AVAX-USDC
+    base: AVAX
+    quote: USDC
+    coingecko_id: avalanche-2
+    decimals: 18
+  - symbol: DOGE-USDC
+    base: DOGE
+    quote: USDC
+    coingecko_id: dogecoin
+    decimals: 8
+  - symbol: ADA-USDC
+    base: ADA
+    quote: USDC
+    coingecko_id: cardano
+    decimals: 6
+  - symbol: LINK-USDC
+    base: LINK
+    quote: USDC
+    coingecko_id: chainlink
+    decimals: 18
+  - symbol: DOT-USDC
+    base: DOT
+    quote: USDC
+    coingecko_id: polkadot
+    decimals: 10
+  - symbol: TRX-USDC
+    base: TRX
+    quote: USDC
+    coingecko_id: tron
+    decimals: 6
+  - symbol: MATIC-USDC
+    base: MATIC
+    quote: USDC
+    coingecko_id: matic-network
+    decimals: 18
+  - symbol: LTC-USDC
+    base: LTC
+    quote: USDC
+    coingecko_id: litecoin
+    decimals: 8
+  - symbol: ATOM-USDC
+    base: ATOM
+    quote: USDC
+    coingecko_id: cosmos
+    decimals: 6
+  - symbol: NEAR-USDC
+    base: NEAR
+    quote: USDC
+    coingecko_id: near
+    decimals: 24
+  - symbol: UNI-USDC
+    base: UNI
+    quote: USDC
+    coingecko_id: uniswap
+    decimals: 18
+  - symbol: XLM-USDC
+    base: XLM
+    quote: USDC
+    coingecko_id: stellar
+    decimals: 7
+  - symbol: SHIB-USDC
+    base: SHIB
+    quote: USDC
+    coingecko_id: shiba-inu
+    decimals: 18
+  - symbol: ICP-USDC
+    base: ICP
+    quote: USDC
+    coingecko_id: internet-computer
+    decimals: 8
+  - symbol: TON-USDC
+    base: TON
+    quote: USDC
+    coingecko_id: the-open-network
+    decimals: 9
 
 # ---- Risk envelope ($500). The non-negotiable price of full autonomy. ----
 risk:
-  max_risk_per_trade_pct: 1.0     # $5 on $500
-  max_position_notional_pct: 25.0 # ~$125 cap per position
-  max_concurrent_positions: 2
-  max_deployed_pct: 50.0          # never deploy more than half of equity at once
-  daily_loss_cap_pct: 3.0         # -3% (-$15) -> halt for the day
+  max_risk_per_trade_pct: 1.0     # used by risk_pct sizing as fallback
+  max_position_notional_pct: 15.0 # ~$75 max per position (7 positions × 15% = 105%)
+  max_concurrent_positions: 7     # hold up to 7 of 20 assets at a time
+  max_deployed_pct: 90.0          # stay ≤90% invested (keep a cash buffer)
+  daily_loss_cap_pct: 3.0         # -3% (-$15) → halt for the day
   drawdown_alert_pct: 10.0        # warn
-  drawdown_kill_pct: 15.0         # -15% (-$75) -> kill + require manual re-arm
-  max_trades_per_day: 3
+  drawdown_kill_pct: 15.0         # -15% (-$75) → kill + require manual re-arm
+  max_trades_per_day: 20          # up to 1 entry per asset per day
   leverage_cap: 1                 # spot only; 1x. NEVER raise without review.
-  sizing_mode: risk_pct           # risk_pct | fixed_fraction | vol_target
-  fixed_fraction_pct: 25.0        # only used when sizing_mode == fixed_fraction
-  target_annual_vol_pct: 40.0     # only used when sizing_mode == vol_target (TSMOM)
+  sizing_mode: vol_target         # vol_target: size = (target_vol/realized_vol)*equity
+  fixed_fraction_pct: 20.0        # fallback if vol_target unavailable
+  target_annual_vol_pct: 40.0     # portfolio vol target (scales down in bear markets)
 
-# ---- Strategy. The PROFITABLE backtested choice is trend_long_flat on daily
-#      (+33% net / ~15% maxDD over a full cycle vs B&H +620%/83% DD). GLM overlays it. ----
+# ---- Strategy: RobustTrend — multi-asset Donchian breakout + SMA filter ----
+# Backtested across 10 assets × 9 years. Same parameters for all assets
+# (no per-asset tuning = lower overfitting risk). Holding period: 2-8 weeks.
 strategy:
-  name: trend_long_flat            # swing | trend_long_flat | ema_cross | mean_reversion | momentum
-  timeframe: 1d                    # daily — 4H/intraday loses to fees+slippage (verified)
-  donchian_period: 20             # breakout over N-bar high
-  ema_fast: 9
+  name: robust_trend              # swing | robust_trend | trend_long_flat | ema_cross | mean_reversion | momentum
+  timeframe: 1d                   # daily bars — 4H loses to fees+slippage (verified)
+  donchian_period: 20             # entry: close > 20-bar Donchian high
+  ema_fast: 9                     # used for MarketSnapshot / GLM context
   ema_slow: 21
   atr_period: 14
-  stop_atr_mult: 1.5              # stop = max(1.5*ATR, min_stop_pct)
+  stop_atr_mult: 2.5              # hard stop = entry - 2.5×ATR (wider for trend following)
   min_stop_pct: 1.0
-  take_profit_atr_mult: 3.0
-  volume_filter_mult: 1.2         # require volume > 1.2x average on breakout
+  take_profit_atr_mult: 6.0       # wide TP = entry + 6×ATR (let trends run)
+  volume_filter_mult: 1.0         # no volume filter (unreliable across all assets)
 
 # ---- GLM brain (z.ai PAYG). Regime/sentiment gate, NOT the order-issuer. ----
 glm:
@@ -75,7 +167,6 @@ execution:
 
 # ---- Keeper (stop-loss monitor) ----
 keeper:
-  # Evaluate stops on each 4H bar close + a low-frequency safety poll between bars.
   bar_close_cron: "7 1,5,9,13,17,21 * * *"  # ~every 4h, offset off the hour
   safety_poll_minutes: 15
 

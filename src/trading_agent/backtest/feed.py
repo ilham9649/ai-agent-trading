@@ -13,7 +13,8 @@ from trading_agent.data.market_data import CoinGeckoPriceSource, SimulatedPriceS
 _BASE_MAP = {"WETH": "ETH", "cbBTC": "BTC", "ETH": "ETH", "BTC": "BTC",
              "SOL": "SOL", "BNB": "BNB", "XRP": "XRP", "AVAX": "AVAX", "DOGE": "DOGE",
              "ADA": "ADA", "LINK": "LINK", "DOT": "DOT", "LTC": "LTC", "TRX": "TRX",
-             "ATOM": "ATOM", "NEAR": "NEAR", "MATIC": "MATIC", "UNI": "UNI", "XLM": "XLM"}
+             "ATOM": "ATOM", "NEAR": "NEAR", "MATIC": "MATIC", "UNI": "UNI", "XLM": "XLM",
+             "SHIB": "SHIB", "ICP": "ICP", "TON": "TON"}
 _BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3/klines"  # public market-data mirror (no auth, no geo-block)
 
 
