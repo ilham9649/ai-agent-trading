@@ -75,3 +75,9 @@ def preholiday_days(idx):
 def rule_e(base, idx):
     """chosen rule E: trend base (decided at prior close) x tom boost x pre-holiday boost, cap 1.5x. calendar known ahead, so lag 0."""
     return (base.shift(1).fillna(0) * (1 + tom_days(idx, 1, 3)) * (1 + preholiday_days(idx))).clip(upper=1.5)
+
+
+def rule_c(base, idx):
+    """user-chosen rule C: trend base (prior close) x season (1.5 nov-apr / 1 may-oct) x tom x pre-holiday, cap 2x. calendar on the day."""
+    winter = pd.Series(idx.month.isin([11, 12, 1, 2, 3, 4]), index=idx).astype(float)
+    return (base.shift(1).fillna(0) * (1 + 0.5 * winter) * (1 + tom_days(idx, 1, 3)) * (1 + preholiday_days(idx))).clip(upper=2.0)
