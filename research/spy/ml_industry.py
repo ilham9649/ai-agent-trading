@@ -11,13 +11,16 @@ frozen before running, no retuning after:
   caveat: the industry file was mined 3 times before (momentum, breadth, low-vol), so it is only partly clean."""
 import numpy as np, pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from engine import *
 from strat_f import french
 from strat_bc import rule_e
 
 
 
-def industry_probs():
+def industry_probs(target="1m", model="gb"):
     """walk-forward ml probabilities (month-end x industry) and the inputs they came from (~40 s)."""
     ind = french("49_Industry_Portfolios").mask(lambda x: x <= -0.99)
     ff = french("F-F_Research_Data_Factors")
@@ -41,7 +44,11 @@ def industry_probs():
     mret = mret.where(R.notna().groupby(idx.to_period("M")).all())
     nxt = mret.shift(-1)
     nxt.index = me
-    y = nxt.sub(nxt.median(axis=1), axis=0).gt(0).astype(float).where(nxt.notna()).stack(future_stack=True)
+    if target == "1m": tgt, lag_m = nxt, 1
+    elif target == "riskadj": tgt, lag_m = nxt / F["vol60"].loc[me].values, 1          # next-month return per unit of recent vol
+    elif target == "3m": tgt, lag_m = ((1 + mret).rolling(3).apply(np.prod, raw=True) - 1).shift(-3), 3
+    tgt.index = me
+    y = tgt.sub(tgt.median(axis=1), axis=0).gt(0).astype(float).where(tgt.notna()).stack(future_stack=True)
     P["y"] = y.reindex(P.index)
     P = P.dropna(subset=list(F) + ["mkt_ens", "mkt_r12"])
     feats = list(F) + ["mkt_ens", "mkt_r12"]
@@ -49,10 +56,15 @@ def industry_probs():
     dates = P.index.get_level_values(0)
     for yr in range(1950, idx[-1].year + 1):
         test = dates.year == yr
-        cut = pd.Timestamp(f"{yr - 1}-11-30")                                          # month-end labels through dec (yr-1) need jan data: stop at nov
+        cut = pd.Timestamp(f"{yr - 1}-12-01") - pd.offsets.MonthEnd(lag_m)            # last month end whose label ends by dec 31 of yr-1
         tr = (dates <= cut) & P.y.notna()
+        if not test.any(): continue
         m = HistGradientBoostingClassifier(max_depth=3, max_iter=200, learning_rate=0.05, random_state=0).fit(P.loc[tr, feats], P.loc[tr, "y"])
-        if test.any(): prob[test] = m.predict_proba(P.loc[test, feats])[:, 1]
+        p = m.predict_proba(P.loc[test, feats])[:, 1]
+        if model == "gb+lr":
+            lr = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=1000)).fit(P.loc[tr, feats], P.loc[tr, "y"])
+            p = (p + lr.predict_proba(P.loc[test, feats])[:, 1]) / 2
+        prob[test] = p
     return R, d, idx, ens, P, nxt, prob
 
 
