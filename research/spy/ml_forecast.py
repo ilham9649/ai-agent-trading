@@ -37,31 +37,32 @@ fwd = ex[::-1].rolling(21).sum()[::-1].shift(-1)                 # excess return
 y = (fwd > 0).astype(float).where(fwd.notna())
 ok_row = X.notna().all(axis=1)
 
-models = {"GB": lambda: HistGradientBoostingClassifier(max_depth=3, max_iter=200, learning_rate=0.05, random_state=0),
-          "LR": lambda: make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=1000))}
-P = {k: pd.Series(np.nan, index=idx) for k in models}
-for yr in range(1950, idx[-1].year + 1):
-    test = (idx.year == yr) & ok_row
-    cut = idx[idx < f"{yr}-01-01"][-22]                           # last row whose 21d label is complete before the year starts
-    tr = ok_row & y.notna() & (idx <= cut)
-    assert fwd.index[tr].max() <= cut
-    for k, mk in models.items():
-        m = mk().fit(X[tr], y[tr]); P[k][test] = m.predict_proba(X[test])[:, 1]
+if __name__ == "__main__":
+    models = {"GB": lambda: HistGradientBoostingClassifier(max_depth=3, max_iter=200, learning_rate=0.05, random_state=0),
+              "LR": lambda: make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=1000))}
+    P = {k: pd.Series(np.nan, index=idx) for k in models}
+    for yr in range(1950, idx[-1].year + 1):
+        test = (idx.year == yr) & ok_row
+        cut = idx[idx < f"{yr}-01-01"][-22]                           # last row whose 21d label is complete before the year starts
+        tr = ok_row & y.notna() & (idx <= cut)
+        assert fwd.index[tr].max() <= cut
+        for k, mk in models.items():
+            m = mk().fit(X[tr], y[tr]); P[k][test] = m.predict_proba(X[test])[:, 1]
 
-rE, _ = run(rule_e(ens, idx), d, lag=0, borrow_spread=0.01)
-E_ = {"1950-2007": ("1950-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
-for k, p in P.items():
-    base = ((p - 0.45) / 0.2).clip(0, 1).fillna(0)
-    rM, _ = run(rule_e(base, idx), d, lag=0, borrow_spread=0.01)
-    hit = ((p > 0.5) == (y == 1))[p.notna() & y.notna()].mean()
-    print(f"\n##### {k}: out-of-sample hit rate {hit:.1%} (base rate up {y[p.notna()].mean():.1%}); mean base {base.loc['1950':].mean():.2f} vs ens {ens.loc['1950':].mean():.2f}")
-    ok = True
-    for e, (a, b) in E_.items():
-        st = {n: stats(v.loc[a:b], d.rf) for n, v in {"spy": d.r, "E": rE, f"ML {k}": rM}.items()}
-        print(f"=== {e} ===")
-        for n, s in st.items(): print(f"  {n:6s} cagr {s['cagr']:6.1%} sh {s['sharpe']:.2f} dd {s['maxdd']:6.1%}")
-        pt, lo, hi, _ = sharpe_diff_ci(rM.loc[a:b], rE.loc[a:b], d.rf, n=1000)
-        print(f"  dSharpe vs E {pt:+.2f} [{lo:+.2f},{hi:+.2f}]")
-        ok &= pt >= 0.03 and st[f"ML {k}"]["maxdd"] >= st["E"]["maxdd"]
-    print("ADOPT" if ok else "REJECT")
-pd.DataFrame(P).to_csv(D / "ml_forecast_probs.csv")
+    rE, _ = run(rule_e(ens, idx), d, lag=0, borrow_spread=0.01)
+    E_ = {"1950-2007": ("1950-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
+    for k, p in P.items():
+        base = ((p - 0.45) / 0.2).clip(0, 1).fillna(0)
+        rM, _ = run(rule_e(base, idx), d, lag=0, borrow_spread=0.01)
+        hit = ((p > 0.5) == (y == 1))[p.notna() & y.notna()].mean()
+        print(f"\n##### {k}: out-of-sample hit rate {hit:.1%} (base rate up {y[p.notna()].mean():.1%}); mean base {base.loc['1950':].mean():.2f} vs ens {ens.loc['1950':].mean():.2f}")
+        ok = True
+        for e, (a, b) in E_.items():
+            st = {n: stats(v.loc[a:b], d.rf) for n, v in {"spy": d.r, "E": rE, f"ML {k}": rM}.items()}
+            print(f"=== {e} ===")
+            for n, s in st.items(): print(f"  {n:6s} cagr {s['cagr']:6.1%} sh {s['sharpe']:.2f} dd {s['maxdd']:6.1%}")
+            pt, lo, hi, _ = sharpe_diff_ci(rM.loc[a:b], rE.loc[a:b], d.rf, n=1000)
+            print(f"  dSharpe vs E {pt:+.2f} [{lo:+.2f},{hi:+.2f}]")
+            ok &= pt >= 0.03 and st[f"ML {k}"]["maxdd"] >= st["E"]["maxdd"]
+        print("ADOPT" if ok else "REJECT")
+    pd.DataFrame(P).to_csv(D / "ml_forecast_probs.csv")
