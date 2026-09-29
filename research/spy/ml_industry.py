@@ -20,7 +20,7 @@ from strat_bc import rule_e
 
 
 
-def industry_probs(target="1m", model="gb", extra=()):
+def industry_probs(target="1m", model="gb", extra=(), seed=0):
     """walk-forward ml probabilities (month-end x industry) and the inputs they came from (~40 s)."""
     ind = french("49_Industry_Portfolios").mask(lambda x: x <= -0.99)
     ff = french("F-F_Research_Data_Factors")
@@ -68,7 +68,7 @@ def industry_probs(target="1m", model="gb", extra=()):
         cut = pd.Timestamp(f"{yr - 1}-12-01") - pd.offsets.MonthEnd(lag_m)            # last month end whose label ends by dec 31 of yr-1
         tr = (dates <= cut) & P.y.notna()
         if not test.any(): continue
-        m = HistGradientBoostingClassifier(max_depth=3, max_iter=200, learning_rate=0.05, random_state=0).fit(P.loc[tr, feats], P.loc[tr, "y"])
+        m = HistGradientBoostingClassifier(max_depth=3, max_iter=200, learning_rate=0.05, random_state=seed).fit(P.loc[tr, feats], P.loc[tr, "y"])
         p = m.predict_proba(P.loc[test, feats])[:, 1]
         if model == "gb+lr":
             lr = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=1000)).fit(P.loc[tr, feats], P.loc[tr, "y"])
