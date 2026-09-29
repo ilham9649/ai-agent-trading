@@ -64,3 +64,14 @@ if __name__ == "__main__":
         dd = d.loc[r.index[0]:]
         rows.append(report(name + f" [{pos.loc[r.index].mean():.0%} inv]", r, dd, dd.r))
     print(table(rows))
+
+
+def preholiday_days(idx):
+    """1.0 on the last trading day before a weekday market closure (also flags a few unscheduled closures)."""
+    d = idx.values.astype("datetime64[D]")
+    return pd.Series(np.r_[np.busday_count(d[:-1], d[1:]) > 1, False], index=idx).astype(float)
+
+
+def rule_e(base, idx):
+    """chosen rule E: trend base (decided at prior close) x tom boost x pre-holiday boost, cap 1.5x. calendar known ahead, so lag 0."""
+    return (base.shift(1).fillna(0) * (1 + tom_days(idx, 1, 3)) * (1 + preholiday_days(idx))).clip(upper=1.5)
