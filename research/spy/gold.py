@@ -72,3 +72,12 @@ if __name__ == "__main__":
     for k2, name in [(1.5, "x1.5"), (2.0, "x2.0")]:
         ov2 = x.E + 0.2 * (x.gold.mean() + k2 * (x.gold - x.gold.mean()) - x.rf); s2 = mstats(ov2, x.rf)
         print(f"  stress {name}: {s2['cagr']:.1%}/{s2['sh']:.2f}/{s2['dd']:.1%}  dSharpe {s2['sh'] - s0['sh']:+.2f}")
+
+# split check (reported either way, no retuning): is the 2017-26 gain only the 2024-26 gold run?
+if __name__ == "__main__":
+    for e, (a, b) in {"2017-23": ("2017-01-01", "2023-12-31"), "2024-26": ("2024-01-01", None)}.items():
+        s0, s1 = stats(rE.loc[a:b], d.rf), stats(rGL.loc[a:b], d.rf)
+        pt, lo, hi, _ = sharpe_diff_ci(rGL.loc[a:b], rE.loc[a:b], d.rf, n=1000)
+        print(f"  GLD {e}: E {s0['cagr']:.1%}/{s0['sharpe']:.2f}/{s0['maxdd']:.1%} -> {s1['cagr']:.1%}/{s1['sharpe']:.2f}/{s1['maxdd']:.1%}  dSharpe {pt:+.2f} [{lo:+.2f},{hi:+.2f}]")
+# result note: the frozen monthly check printed ADOPT, but that series is monthly averages (smoothed).
+# corrected holdout 1972-2007 = +0.02 and GLD 2008-16 = +0.02: ties under the +0.03 bar. not a clean pass; user decision.
