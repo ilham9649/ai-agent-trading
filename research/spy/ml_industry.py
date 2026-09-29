@@ -20,7 +20,7 @@ from strat_bc import rule_e
 
 
 
-def industry_probs(target="1m", model="gb"):
+def industry_probs(target="1m", model="gb", extra=()):
     """walk-forward ml probabilities (month-end x industry) and the inputs they came from (~40 s)."""
     ind = french("49_Industry_Portfolios").mask(lambda x: x <= -0.99)
     ff = french("F-F_Research_Data_Factors")
@@ -44,6 +44,15 @@ def industry_probs(target="1m", model="gb"):
     mret = mret.where(R.notna().groupby(idx.to_period("M")).all())
     nxt = mret.shift(-1)
     nxt.index = me
+    xf = []
+    if "season" in extra:                                   # same calendar month as the month being predicted, past 20 years
+        sea = pd.concat([mret.shift(12 * k - 1) for k in range(1, 21)]).groupby(level=0).mean()
+        sea = sea.where(pd.concat([mret.shift(12 * k - 1).notna() for k in range(1, 21)]).groupby(level=0).sum() >= 5)
+        sea.index = me; P["season"] = sea.stack(future_stack=True).reindex(P.index).values; xf.append("season")
+    if "macro" in extra:
+        yl = (d.rf * TD * 100).rolling(21).mean()
+        P["yield"] = yl.loc[me].reindex(P.index.get_level_values(0)).values
+        P["dyield"] = (yl - yl.shift(252)).loc[me].reindex(P.index.get_level_values(0)).values; xf += ["yield", "dyield"]
     if target == "1m": tgt, lag_m = nxt, 1
     elif target == "riskadj": tgt, lag_m = nxt / F["vol60"].loc[me].values, 1          # next-month return per unit of recent vol
     elif target == "3m": tgt, lag_m = ((1 + mret).rolling(3).apply(np.prod, raw=True) - 1).shift(-3), 3
@@ -51,7 +60,7 @@ def industry_probs(target="1m", model="gb"):
     y = tgt.sub(tgt.median(axis=1), axis=0).gt(0).astype(float).where(tgt.notna()).stack(future_stack=True)
     P["y"] = y.reindex(P.index)
     P = P.dropna(subset=list(F) + ["mkt_ens", "mkt_r12"])
-    feats = list(F) + ["mkt_ens", "mkt_r12"]
+    feats = list(F) + ["mkt_ens", "mkt_r12"] + xf
     prob = pd.Series(np.nan, index=P.index)
     dates = P.index.get_level_values(0)
     for yr in range(1950, idx[-1].year + 1):
