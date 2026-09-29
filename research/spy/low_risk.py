@@ -3,7 +3,6 @@ import numpy as np, pandas as pd
 from engine import *
 from strat_f import french
 from strat_bc import tom_days
-from industry import merge_sat
 
 ff = french("F-F_Research_Data_Factors")
 d = merge_sat(pd.DataFrame({"r": ff["Mkt-RF"] + ff["RF"], "rf": ff["RF"]}))

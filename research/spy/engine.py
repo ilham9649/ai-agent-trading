@@ -96,3 +96,11 @@ def band(px, n, w):
         elif p < mm * (1 - w): on = 0.0
         out.append(on)
     return pd.Series(out, index=px.index)
+
+
+def merge_sat(df):
+    """compound pre-1953 saturday sessions into the next weekday."""
+    key = pd.Series(df.index, index=df.index).where(df.index.dayofweek != 5).bfill()
+    out = df.groupby(key.values).apply(lambda x: (1 + x).prod(min_count=1) - 1)
+    out.index = pd.DatetimeIndex(out.index)
+    return out

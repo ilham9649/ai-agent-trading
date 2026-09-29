@@ -8,13 +8,6 @@ from strat_f import french
 from strat_bc import tom_days
 
 
-def merge_sat(df):
-    key = pd.Series(df.index, index=df.index).where(df.index.dayofweek != 5).bfill()
-    out = df.groupby(key.values).apply(lambda x: (1 + x).prod(min_count=1) - 1)
-    out.index = pd.DatetimeIndex(out.index)
-    return out
-
-
 ind = french("49_Industry_Portfolios").mask(lambda x: x <= -0.99)
 ff = french("F-F_Research_Data_Factors")
 raw = ind.join(pd.DataFrame({"mkt": ff["Mkt-RF"] + ff["RF"], "rf": ff["RF"]}), how="inner")
