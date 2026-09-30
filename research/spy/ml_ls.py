@@ -31,13 +31,14 @@ hold = sel.reindex(idx).shift(1).ffill().fillna(False).astype(bool)
 s2 = (R.where(hold).mean(axis=1) - hold.astype(float).diff().abs().sum(axis=1).fillna(0) / 20 * 10e-4).fillna(0)
 ens = (band(d.px, 150, .03) + band(d.px, 200, .03) + band(d.px, 250, .03)) / 3
 rS2 = run(rule_c(ens, idx), d.assign(r=s2), lag=0, borrow_spread=0.01)[0]
-combo = rS2 + 0.5 * book.reindex(rS2.index).fillna(0)
-tw = W.diff().abs().sum(axis=1)
-print(f"book turnover per rebalance {tw[tw > 0].mean():.2f} (of 2.0 gross); cost drag {(tw * 10e-4).loc['1950':].mean() * TD:.1%}/yr; "
-      f"corr with S2 {book.loc['1950':].corr(rS2.loc['1950':]):+.2f}")
-ok = True
-for e, (a, b) in {"1950-2007": ("1950-02-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}.items():
-    s0, s1, sb = stats(rS2.loc[a:b], d.rf), stats(combo.loc[a:b], d.rf), stats(book.loc[a:b] + d.rf.loc[a:b], d.rf)
-    print(f"{e}: book alone {sb['cagr']:.1%}/{sb['sharpe']:.2f}/{sb['maxdd']:.1%}   S2 {s0['cagr']:.1%}/{s0['sharpe']:.2f}/{s0['maxdd']:.1%} -> S2 + 0.5 book {s1['cagr']:.1%}/{s1['sharpe']:.2f}/{s1['maxdd']:.1%}")
-    ok &= s1["cagr"] > s0["cagr"] and s1["maxdd"] >= s0["maxdd"]
-print("ADOPT" if ok else "REJECT")
+if __name__ == "__main__":
+    combo = rS2 + 0.5 * book.reindex(rS2.index).fillna(0)
+    tw = W.diff().abs().sum(axis=1)
+    print(f"book turnover per rebalance {tw[tw > 0].mean():.2f} (of 2.0 gross); cost drag {(tw * 10e-4).loc['1950':].mean() * TD:.1%}/yr; "
+          f"corr with S2 {book.loc['1950':].corr(rS2.loc['1950':]):+.2f}")
+    ok = True
+    for e, (a, b) in {"1950-2007": ("1950-02-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}.items():
+        s0, s1, sb = stats(rS2.loc[a:b], d.rf), stats(combo.loc[a:b], d.rf), stats(book.loc[a:b] + d.rf.loc[a:b], d.rf)
+        print(f"{e}: book alone {sb['cagr']:.1%}/{sb['sharpe']:.2f}/{sb['maxdd']:.1%}   S2 {s0['cagr']:.1%}/{s0['sharpe']:.2f}/{s0['maxdd']:.1%} -> S2 + 0.5 book {s1['cagr']:.1%}/{s1['sharpe']:.2f}/{s1['maxdd']:.1%}")
+        ok &= s1["cagr"] > s0["cagr"] and s1["maxdd"] >= s0["maxdd"]
+    print("ADOPT" if ok else "REJECT")
