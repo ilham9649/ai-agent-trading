@@ -19,20 +19,21 @@ br = y.shift(1) / TD - dmod.shift(1) * y.diff()
 steep = ((_fred("DGS10") - _fred("DTB3")).reindex(idx).ffill() > 1.0).astype(float).shift(1)
 carry = (steep * (br - r.d.rf)).fillna(0)
 ml = ml_ls.book.reindex(idx).fillna(0)
-P = {"1963-2007": ("1963-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
-mk = {e: stats(r.d.r.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
-print(f"corr since 1963: R4-ML {run(w4, r.d.assign(r=r.b3), lag=0)[0].loc['1963':].corr(ml.loc['1963':]):+.2f}, "
-      f"R4-CARRY {run(w4, r.d.assign(r=r.b3), lag=0)[0].loc['1963':].corr(carry.loc['1963':]):+.2f}, ML-CARRY {ml.loc['1963':].corr(carry.loc['1963':]):+.2f}")
-for spread in [0.01, 0.005]:
-    rows = []
-    for k in np.arange(1.5, 5.01, 0.25):
-        wk = pd.Series(w4.values * np.where(calm == 1, k, 1.0), index=idx)
-        rr = run(wk, r.d.assign(r=r.b3), lag=0, borrow_spread=spread)[0]
-        rk = (rr + k * 0.5 * ml + k * 0.5 * carry).loc["1963":]
-        st = {e: stats(rk.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
-        okk = all(st[e]["cagr"] >= 3 * mk[e]["cagr"] and st[e]["maxdd"] >= mk[e]["maxdd"] for e in P)
-        margin = min(min(st[e]["cagr"] / (3 * mk[e]["cagr"]), mk[e]["maxdd"] / st[e]["maxdd"]) for e in P)
-        rows.append((margin, k, st, okk))
-    for mg, k, st, okk in sorted(rows, key=lambda t: -t[0])[:3]:
-        print(f"spread {spread:.1%} k {k:.2f}: {'MEETS GOAL' if okk else 'fails'} (worst ratio {mg:.2f}) | "
-              + " | ".join(f"{e} {st[e]['cagr']:.1%} sh {st[e]['sharpe']:.2f} dd {st[e]['maxdd']:.1%}" for e in P))
+if __name__ == "__main__":
+    P = {"1963-2007": ("1963-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
+    mk = {e: stats(r.d.r.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
+    print(f"corr since 1963: R4-ML {run(w4, r.d.assign(r=r.b3), lag=0)[0].loc['1963':].corr(ml.loc['1963':]):+.2f}, "
+          f"R4-CARRY {run(w4, r.d.assign(r=r.b3), lag=0)[0].loc['1963':].corr(carry.loc['1963':]):+.2f}, ML-CARRY {ml.loc['1963':].corr(carry.loc['1963':]):+.2f}")
+    for spread in [0.01, 0.005]:
+        rows = []
+        for k in np.arange(1.5, 5.01, 0.25):
+            wk = pd.Series(w4.values * np.where(calm == 1, k, 1.0), index=idx)
+            rr = run(wk, r.d.assign(r=r.b3), lag=0, borrow_spread=spread)[0]
+            rk = (rr + k * 0.5 * ml + k * 0.5 * carry).loc["1963":]
+            st = {e: stats(rk.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
+            okk = all(st[e]["cagr"] >= 3 * mk[e]["cagr"] and st[e]["maxdd"] >= mk[e]["maxdd"] for e in P)
+            margin = min(min(st[e]["cagr"] / (3 * mk[e]["cagr"]), mk[e]["maxdd"] / st[e]["maxdd"]) for e in P)
+            rows.append((margin, k, st, okk))
+        for mg, k, st, okk in sorted(rows, key=lambda t: -t[0])[:3]:
+            print(f"spread {spread:.1%} k {k:.2f}: {'MEETS GOAL' if okk else 'fails'} (worst ratio {mg:.2f}) | "
+                  + " | ".join(f"{e} {st[e]['cagr']:.1%} sh {st[e]['sharpe']:.2f} dd {st[e]['maxdd']:.1%}" for e in P))
