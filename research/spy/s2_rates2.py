@@ -36,11 +36,12 @@ rS2 = run(wC, d.assign(r=s2n), lag=0, borrow_spread=0.01)[0]
 cfg = {"R3 momentum in hikes": run(wC, d.assign(r=b3), lag=0, borrow_spread=0.01)[0],
        "R4 R3 at half in hikes": run(rule_c(ens * (1 - 0.5 * hike.shift(-1).fillna(0)), idx), d.assign(r=b3), lag=0, borrow_spread=0.01)[0]}
 assert (hm.sum(axis=1).loc["1928":] == 10).all() and (H.sum(axis=1).loc["1928":] == 10).all()
-P = {"1927-62": ("1927-07-01", "1962-12-31"), "1963-2007": ("1963-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
-for k, rX in cfg.items():
-    ok, line = True, []
-    for e, (a, b) in P.items():
-        s0, s1 = stats(rS2.loc[a:b], d.rf), stats(rX.loc[a:b], d.rf)
-        line.append(f"{e}: S2 {s0['cagr']:.1%}/{s0['sharpe']:.2f}/{s0['maxdd']:.1%} -> {s1['cagr']:.1%}/{s1['sharpe']:.2f}/{s1['maxdd']:.1%}")
-        ok &= s1["cagr"] > s0["cagr"] and s1["maxdd"] >= s0["maxdd"]
-    print(f"##### {k}: {'ADOPT' if ok else 'REJECT'}\n  " + "\n  ".join(line))
+if __name__ == "__main__":
+    P = {"1927-62": ("1927-07-01", "1962-12-31"), "1963-2007": ("1963-01-01", "2007-12-31"), "2008-26": ("2008-01-01", None)}
+    for k, rX in cfg.items():
+        ok, line = True, []
+        for e, (a, b) in P.items():
+            s0, s1 = stats(rS2.loc[a:b], d.rf), stats(rX.loc[a:b], d.rf)
+            line.append(f"{e}: S2 {s0['cagr']:.1%}/{s0['sharpe']:.2f}/{s0['maxdd']:.1%} -> {s1['cagr']:.1%}/{s1['sharpe']:.2f}/{s1['maxdd']:.1%}")
+            ok &= s1["cagr"] > s0["cagr"] and s1["maxdd"] >= s0["maxdd"]
+        print(f"##### {k}: {'ADOPT' if ok else 'REJECT'}\n  " + "\n  ".join(line))
