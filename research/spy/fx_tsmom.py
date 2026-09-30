@@ -30,26 +30,27 @@ sig = np.sign(tr12).where(ok)
 W = sig.div(ok.sum(axis=1).replace(0, np.nan), axis=0).fillna(0).shift(2)
 fx = ((W * tot.fillna(0)).sum(axis=1) - W.diff().abs().sum(axis=1).fillna(0) * 3e-4).fillna(0)
 print("currencies in use:", {y: int(ok.loc[str(y)].any().sum()) for y in [1973, 1986, 2000, 2010, 2026]})
-R4u = run(v.w4, r.d.assign(r=r.b3), lag=0, borrow_spread=0.01)[0]
-a0 = "1973-01-01"
-print(f"fx stream alone: 1973-2007 {stats(fx.loc[a0:'2007'] + r.d.rf.loc[a0:'2007'], r.d.rf)['sharpe']:.2f} sharpe, 2008-26 "
-      f"{stats(fx.loc['2008':] + r.d.rf.loc['2008':], r.d.rf)['sharpe']:.2f}; corr with R4 {fx.loc[a0:].corr(R4u.loc[a0:]):+.2f}, "
-      f"with ML {fx.loc[a0:].corr(v.ml.loc[a0:]):+.2f}, with CARRY {fx.loc[a0:].corr(v.carry.loc[a0:]):+.2f}")
+if __name__ == "__main__":
+    R4u = run(v.w4, r.d.assign(r=r.b3), lag=0, borrow_spread=0.01)[0]
+    a0 = "1973-01-01"
+    print(f"fx stream alone: 1973-2007 {stats(fx.loc[a0:'2007'] + r.d.rf.loc[a0:'2007'], r.d.rf)['sharpe']:.2f} sharpe, 2008-26 "
+          f"{stats(fx.loc['2008':] + r.d.rf.loc['2008':], r.d.rf)['sharpe']:.2f}; corr with R4 {fx.loc[a0:].corr(R4u.loc[a0:]):+.2f}, "
+          f"with ML {fx.loc[a0:].corr(v.ml.loc[a0:]):+.2f}, with CARRY {fx.loc[a0:].corr(v.carry.loc[a0:]):+.2f}")
 
-def combo(k, spread=0.01, with_fx=True):
-    wk = pd.Series(v.w4.values * np.where(v.calm == 1, k, 1.0), index=idx)
-    rr = run(wk, r.d.assign(r=r.b3), lag=0, borrow_spread=spread)[0]
-    return (rr + k * 0.5 * (v.ml + v.carry + (fx if with_fx else 0))).loc[a0:]
+    def combo(k, spread=0.01, with_fx=True):
+        wk = pd.Series(v.w4.values * np.where(v.calm == 1, k, 1.0), index=idx)
+        rr = run(wk, r.d.assign(r=r.b3), lag=0, borrow_spread=spread)[0]
+        return (rr + k * 0.5 * (v.ml + v.carry + (fx if with_fx else 0))).loc[a0:]
 
-P = {"1973-2007 (calibrate)": (a0, "2007-12-31"), "2008-26 (test)": ("2008-01-01", None)}
-mk = {e: stats(r.d.r.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
-for with_fx in [False, True]:
-    ks = np.arange(1.0, 5.01, 0.25); kc = None
-    for k in ks:
-        if stats(combo(k, with_fx=with_fx).loc[a0:"2007"], r.d.rf)["maxdd"] >= mk["1973-2007 (calibrate)"]["maxdd"]: kc = k
-    rk = combo(kc, with_fx=with_fx)
-    st = {e: stats(rk.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
-    t = st["2008-26 (test)"]; m = mk["2008-26 (test)"]
-    verdict = "MEETS GOAL" if t["cagr"] >= 3 * m["cagr"] and t["maxdd"] >= m["maxdd"] else "fails"
-    print(f"{'with FX' if with_fx else 'without FX'}: calibrated k {kc:.2f} | " + " | ".join(f"{e} {s['cagr']:.1%} sh {s['sharpe']:.2f} dd {s['maxdd']:.1%}" for e, s in st.items())
-          + f" | 2008-26 = {t['cagr'] / m['cagr']:.2f}x index -> {verdict}")
+    P = {"1973-2007 (calibrate)": (a0, "2007-12-31"), "2008-26 (test)": ("2008-01-01", None)}
+    mk = {e: stats(r.d.r.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
+    for with_fx in [False, True]:
+        ks = np.arange(1.0, 5.01, 0.25); kc = None
+        for k in ks:
+            if stats(combo(k, with_fx=with_fx).loc[a0:"2007"], r.d.rf)["maxdd"] >= mk["1973-2007 (calibrate)"]["maxdd"]: kc = k
+        rk = combo(kc, with_fx=with_fx)
+        st = {e: stats(rk.loc[a:b], r.d.rf) for e, (a, b) in P.items()}
+        t = st["2008-26 (test)"]; m = mk["2008-26 (test)"]
+        verdict = "MEETS GOAL" if t["cagr"] >= 3 * m["cagr"] and t["maxdd"] >= m["maxdd"] else "fails"
+        print(f"{'with FX' if with_fx else 'without FX'}: calibrated k {kc:.2f} | " + " | ".join(f"{e} {s['cagr']:.1%} sh {s['sharpe']:.2f} dd {s['maxdd']:.1%}" for e, s in st.items())
+              + f" | 2008-26 = {t['cagr'] / m['cagr']:.2f}x index -> {verdict}")
